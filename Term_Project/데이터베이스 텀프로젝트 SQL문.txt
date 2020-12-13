@@ -1,0 +1,100 @@
+테이블 생성을 위한 SQL문ty
+-사생(student)
+create table student
+(id char(10), name varchar(20), grade int, department varchar(40), gender varchar(20), period varchar(20), primary key(id));
+-호실(room)
+create table room 
+(number char(10), state varchar(20), primary key(number));
+-방배정(room_arrange)
+create table room_arrange 
+(s_id char(10), r_number char(10), ad_name varchar(20));
+-행정직원(administrator)
+create table administrator 
+(name varchar(20), appointment varchar(20), work_hour varchar(20), primary key(name));
+-시설관리원(housekeeping)
+create table housekeeping 
+(name varchar(20), appointment varchar(20), department varchar(20), primary key(name));
+-시설관리원 업무시간(h_work_hour)
+create table h_work_hour 
+(name varchar(20), work_hour_1 varchar(20), work_hour_2 varchar(20), primary key(name));
+-경비원(caretaker)
+create table caretaker 
+(name varchar(20), birth_date varchar(20), work_hour varchar(20), primary key(name));
+-경비원 업무(care_work)
+create table care_work 
+(name varchar(20), work_1 varchar(20), work_2 varchar(20), primary key(name));
+-기타 시설(etc_facility)
+create table etc_facility 
+(number char(10), name varchar(20), state varchar(20), floor int, primary key(number));
+-상벌점(point)
+create table point 
+(s_id char(10), reason varchar(20), assignor varchar(20), as_date date, point int default 0, primary key(s_id));
+-외박(sleepover)
+create table sleepover 
+(s_id char(10), sl_date date, period varchar(40), approval_date date, primary key(s_id));
+-민원(complaint)
+create table complaint 
+(id varchar(20), type varchar(20), transactor varchar(20) default null, state varchar(20) default '미처리', f_number char(10), primary key(id));
+-민원신청(com_applicate)
+create table com_applicate 
+(s_id char(10), c_id varchar(20), type varchar(20), f_number char(10), app_time date);
+-민원처리(com_handling)
+create table com_handling 
+(t_name varchar(20), c_id varchar(20), han_time date);
+-체온체크(take_temperature)
+create table take_temperature (ca_name varchar(20), s_id char(10), temperature decimal(5,1), take_date date);
+-관리(managment)
+create table management 
+(ad_name varchar(20), s_id char(10), edu_result varchar(20), inspect_result varchar(20), primary key(s_id));
+-안전교육(safety_edu)
+create table safety_edu 
+(s_id char(10), result varchar(20), edu_date date, primary key(s_id));
+-생활점검(life_inspection)
+create table life_inspection 
+(s_id char(10), result varchar(20), inspection date, primary key(s_id));
+-룸메이트(roommate)
+create table roommate 
+(s_id_1 char(10), s_id_2 char(10), period varchar(20));
+
+사용자별 작업 내용 처리를 위한 SQL문
+-기숙사 시설 사용자
+>배정호실 과 룸메이트 검색
+select ra.s_id, rm.s_id_1, rm.s_id_2, ra.r_number from roommate rm, room_arrange ra where ra.s_id = '2015111728' and (rm.s_id_1 = '2015111728' or rm.s_id_2 = '2015111728');
+>상벌점 검색
+select s_id, reason, point from point where s_id = '2015111728';
+>민원신청
+insert into com_applicate values ('2015111730', '1-101', '시설', '4202', '2020-11-26'), ('2015111728', '1-102', '시설', '101', '2020-12-11'), ('2015111728', '1-103', '시설', '104', '2020-12-12');
+>사생이름으로 민원처리 결과 확인
+select c.id, app.s_id, c.state from complaint c, com_applicate app, student st where st.name = '이현진' and c.id = app.c_id and st.id = app.s_id;
+>외박신청
+delete from sleepover where s_id = '2015111728';
+insert into sleepover values ('2015111728', '2020-12-12', '2021-2-10-15', null);
+
+-행정관리자
+>기간별 사생 검색 후 룸메이트 지정
+create view student6 as select id, period, gender from student where period = '6개월';
+insert into roommate values ('2015111728', '2015111730', 6개월);
+>사생별 방배정
+insert into room_arrange values ('2015111728', '4202', '홍길동');
+>사생의 생활점검·안전교육 결과 확인 및 상벌점 부여
+update point set point = point +3 where s_id in (select s_id from life_inspection where result = '양호');
+update point set point = point -3 where s_id not in (select s_id from life_inspection where result = '양호');
+update point set point = point +3 where s_id not in (select s_id from safety_edu where result = '수료');
+update point set point = point -3 where s_id not in (select s_id from safety_edu where result = '수료');
+>특정 상벌점 점수를 넘은 사생 검색 및 제거
+delete from student where id in (select s_id from point group by s_id having sum(point) < -20);
+>외박승인
+update sleepover set approval_date = '2020-12-14';
+
+-시설관리자
+>민원신청 테이블의 정보를 민원 테이블로 전송
+insert into complaint (id, type, f_number) (select ap.c_id, ap.type, ap.f_number from com_applicate ap where ap.app_time = '2020-12-12');
+>사생 이름으로 미처리 민원 검색
+select c.id, c.type, c.f_numer, app.app_time from student st, com_applicate app, complaint c where st name = '이현진' and c.state = '미처리' and st.id = app.s_id and c.id = app.c_id;
+>민원에 맞는 시설관리자 및 경비원 검색
+select h.name, h.department from housekeeping h, h_work_hour hw where hw.work_hour_1 = '월요일' or hw.work_hour_2 = '월요일' and h.name = hw.name;
+select ca.name, ca.work_hour from caretaker ca, care_work cw where ca.work_hour = '월요일' and ca.name = cw.name;
+>민원 처리
+update complaint set transactor = '미리내', state = '완료' where id in (select c_id from com_handling where han_time = '2020-12-14');
+>특정 체온을 넘은 사생 검색
+select s_id, temperature, ca_name from take_temperature where temperature >= 37.5;
